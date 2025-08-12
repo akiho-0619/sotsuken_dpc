@@ -1,0 +1,6 @@
+__pycache__/
+venv*/
+Classification/Vegetable Images*/
+Classification/archive.zip
+segment-anything/
+sam_vit_h_4b8939.pth
