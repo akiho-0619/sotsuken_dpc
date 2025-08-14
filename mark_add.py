@@ -1,7 +1,7 @@
 from PIL import Image, ImageDraw
 
 # 画像を読み込む（例: 'input.jpg'）
-image = Image.open(r"E:\sotsuken\simple_pics\nasu.jpg").convert('RGB')
+image = Image.open(r"E:\sotsuken\simple_pics\nasu.png").convert("RGB")
 
 # 描画用オブジェクトを作成
 draw = ImageDraw.Draw(image)
@@ -19,4 +19,4 @@ bottom_right = (x_offset + rect_size, y_offset + rect_size)
 draw.rectangle([top_left, bottom_right], fill=(0, 0, 0))
 
 # 結果を保存（例: 'output.jpg'）
-image.save(r"E:\sotsuken\simple_pics\nasu_marked_p.jpg")
+image.save(r"E:\sotsuken\simple_pics\nasu_marked.png", "PNG")

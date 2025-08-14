@@ -9,7 +9,7 @@ mask_generator = SamAutomaticMaskGenerator(
     points_per_side=32,  # デフォルトは32、必要に応じて調整
     points_per_batch=64,  # バッチサイズを調整
     pred_iou_thresh=0.98,  # IOU閾値を調整
-    stability_score_thresh=0.98,  # 安定性スコアの閾値を調整
+    stability_score_thresh=0.95,  # 安定性スコアの閾値を調整
     crop_n_layers=0,  # クロップのレイヤー数を調整
     crop_n_points_downscale_factor=1,  # クロップのポイントダウンスケール係数を調整
     min_mask_region_area=3000,  # 小さい領域を無視
@@ -22,10 +22,10 @@ better parameters for SAM
     points_per_side=32,  # デフォルトは32、必要に応じて調整
     points_per_batch=64,  # バッチサイズを調整
     pred_iou_thresh=0.98,  # IOU閾値を調整
-    stability_score_thresh=0.95,  # 安定性スコアの閾値を調整
-    crop_n_layers=1,  # クロップのレイヤー数を調整
+    stability_score_thresh=0.98,  # 安定性スコアの閾値を調整
+    crop_n_layers=0,  # クロップのレイヤー数を調整
     crop_n_points_downscale_factor=1,  # クロップのポイントダウンスケール係数を調整
-    min_mask_region_area=1000,  # 小さい領域を無視
+    min_mask_region_area=3000,  # 小さい領域を無視
 
 pred_iou_thresh
 説明: 予測マスク同士のIoU（重なり度）しきい値。これ以上重なるマスクは除外される。
@@ -58,6 +58,10 @@ from math import sqrt
 import sys
 
 import pandas as pd
+import os
+
+import matplotlib.pyplot as plt
+import numpy as np
 
 color_samples = pd.DataFrame(
     columns=[
@@ -74,37 +78,63 @@ color_samples = pd.DataFrame(
 
 color_data_list = []
 
+simple_pics_pathes = [
+    r"E:\sotsuken\simple_pics\carrot_marked.png",
+    r"E:\sotsuken\simple_pics\tomato_marked.png",
+    r"E:\sotsuken\simple_pics\nasu_marked.png",
+]
+
 print(datetime.now())
-s = datetime.now()
+start = datetime.now()
 # pic_path = r"E:\sotsuken\pictures\IMG20240717181328.jpg"
 # pic_path = r"E:\sotsuken\Classification\Vegetable Images\train\Bean\0035.jpg"
-pic_path = r"./pictures/tomato.jpg"
+pic_path = simple_pics_pathes[1]
+print(os.path.basename(pic_path))
 pic = cv2.imread(pic_path)
+# pic = cv2.cvtColor(pic, cv2.COLOR_BGR2RGB)  # RGBに変換
+hsv = cv2.cvtColor(pic, cv2.COLOR_BGR2HSV)
+h, s, v = cv2.split(hsv)
+v = cv2.add(v, 1)  # 40だけ明るく（値は調整可、255を超えると255になる）
+pic = cv2.cvtColor((cv2.merge((h, s, v))), cv2.COLOR_HSV2RGB)
+
+# ---前処理---
+# pic = cv2.GaussianBlur(pic, (5, 5), 0)  # ノイズ除去のための平滑化-ガウシアンブラー
+# pic = cv2.medianBlur(pic, 5)  # メディアンブラーでさらにノイズ除去
+# pic = cv2.cvtColor(pic, cv2.COLOR_BGR2GRAY)  # グレースケール変換
+# pic = cv2.equalizeHist(pic)  # ヒストグラム均等化でコントラスト調整 --多分ダメ
+# pic = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8)).apply(pic)  # コントラスト制御
+# _, pic = cv2.threshold(pic, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)  # 二値化
+# pic = cv2.adaptiveThreshold(  # アダプティブ二値化
+#     pic, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2
+# )
+# kernel = np.ones((3, 3), np.uint8)  #
+# dilated = cv2.dilate(pic, kernel, iterations=1)
+# pic = cv2.erode(thresh, kernel, iterations=1)
+plt.imshow(pic)
+plt.axis("off")
+plt.show()
 # 縦長なら90°回転
 if pic.shape[0] > pic.shape[1]:
     pic = cv2.rotate(pic, cv2.ROTATE_90_CLOCKWISE)
 
 resized_img = cv2.resize(pic, (2000, 1500))
 
-image_rgb = cv2.cvtColor(pic, cv2.COLOR_BGR2RGB)
-image_hsv = cv2.cvtColor(pic, cv2.COLOR_BGR2HSV)
-img_hsv_shape = image_hsv.shape
-masks = mask_generator.generate(image_rgb)
+# image_rgb = cv2.cvtColor(pic, cv2.COLOR_BGR2RGB)
+# image_hsv = cv2.cvtColor(pic, cv2.COLOR_BGR2HSV)
+# img_hsv_shape = image_hsv.shape
+# masks = mask_generator.generate(image_rgb)
+# resized_img = cv2.cvtColor(resized_img, cv2.COLOR_GRAY2RGB)
+masks = mask_generator.generate(resized_img)
 # print(masks)
-print(datetime.now() - s)
+print(datetime.now() - start)
 
 
 pic_x, pic_y = masks[0]["segmentation"].shape
 print(masks[0]["segmentation"].shape)
 
-import matplotlib.pyplot as plt
-import numpy as np
 
 # 元画像のコピーを作成
-masked_image = image_rgb.copy()
-
-
-import numpy as np
+masked_image = resized_img.copy()
 
 
 def is_point_in_ellipse(px, py, ellipse):  # 楕円中心が別の楕円内にあるか判定する関数
@@ -139,6 +169,7 @@ ellipses_list = []
 #
 #     return area1 < area2
 
+
 # def filter_nested_ellipses(ellipses_list):
 #     """内側にある楕円を除去する"""
 #     filtered_ellipses = []
@@ -154,6 +185,38 @@ ellipses_list = []
 #             filtered_ellipses.append(ellipse1)
 #
 #     return filtered_ellipses
+def is_mask_rectangle(segmentation):
+    # seg_uint8 = segmentation.astype(np.uint8) * 255
+    # contours, _ = cv2.findContours(
+    #     seg_uint8, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
+    # )
+    # for cnt in contours:
+    #     epsilon = 0.02 * cv2.arcLength(cnt, True)
+    #     approx = cv2.approxPolyDP(cnt, epsilon, True)
+    #     if len(approx) == 4:  # 頂点が4つ
+    #         x, y, w, h = cv2.boundingRect(cnt)
+    #         area_cnt = cv2.contourArea(cnt)
+    #         area_rect = w * h
+    #         if area_cnt / area_rect > 0.9:  # 面積比が高い
+    #             return True
+    x, w = 0, 0
+    is_rect = False
+    is_split = False
+    for i in segmentation:
+        if sum(i) == 0:
+            continue
+
+        if (x, w) == (0, 0):
+            for num, j in enumerate(i):
+                if j:
+                    x = num if x == 0 else x
+                    w += 1
+
+        else:
+            if False:
+                pass
+
+    return False
 
 
 def main(num, mask):
@@ -277,11 +340,34 @@ def main(num, mask):
             #     print(e, ellipse)
 
             # 楕円の描画は後でまとめて行う（重複チェック後）
+            """
+            for cnt in contours:
+                # 輪郭を多角形近似
+                epsilon = 0.02 * cv2.arcLength(cnt, True)
+                approx = cv2.approxPolyDP(cnt, epsilon, True)
+                if len(approx) == 4:  # 頂点が4つなら矩形
+                    x, y, w, h = cv2.boundingRect(cnt)
+                    area_cnt = cv2.contourArea(cnt)
+                    area_rect = w * h
+                    # 面積比が高い（矩形に近い）ものだけ抽出
+                    if area_cnt / area_rect > 0.8:
+                        print(f"矩形: 位置=({x},{y}), サイズ=({w}x{h})")
+            """
+
+
+print(len(masks))
+rect_masks = [
+    m for m in masks if m["area"] == (m["bbox"][2] + 1) * (m["bbox"][3] + 1)
+]  # is_mask_rectangle(m["segmentation"])
+print(f"矩形マスクの数: {len(rect_masks)}")
+for m in rect_masks:
+    print("masks: ", m["bbox"], m["area"])
 
 
 with ThreadPoolExecutor(max_workers=20) as executor:
-    mask_sorted = sorted(masks, key=lambda x: max(x["segmentation"][1]), reverse=True)
+    mask_sorted = sorted(masks, key=lambda x: max(x["segmentation"][1]), reverse=False)
     futures = []
+    # print(mask_sorted[0])
     for num, mask in enumerate(mask_sorted):
         future = executor.submit(main, num, mask)
         futures.append(future)
